@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mapa Parceiros - RS a Extrema (MG)</title>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background-color: #f1f5f9; }
+    
+    .app-container { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
+    
+    /* Header Responsive Mobile-First */
+    header { 
+      background-color: #0f172a; 
+      color: #ffffff; 
+      padding: 10px 14px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      gap: 8px; 
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+      z-index: 1000; 
+      flex-shrink: 0; 
+    }
+    .logo-title { display: flex; align-items: center; gap: 8px; }
+    .logo-title i { color: #f59e0b; font-size: 20px; }
+    .logo-title h1 { font-size: 15px; font-weight: 700; line-height: 1.2; }
+    .logo-title p { font-size: 10px; color: #94a3b8; }
+    
+    /* Nav Rotas */
+    .route-toggle { display: flex; background-color: #1e293b; padding: 3px; border-radius: 8px; border: 1px solid #334155; }
+    .btn-route { padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: none; display: flex; align-items: center; gap: 4px; background: transparent; color: #cbd5e1; }
+    .btn-route.active { background-color: #f59e0b; color: #020617; font-weight: 700; }
+    
+    .btn-add { background-color: #2563eb; color: #ffffff; border: none; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .btn-add:hover { background-color: #1d4ed8; }
+    
+    /* Layout Mobile Layout Stack */
+    .content-body { display: flex; flex: 1; width: 100%; height: calc(100vh - 60px); position: relative; overflow: hidden; flex-direction: column; }
+    
+    .map-wrapper { width: 100%; height: 50%; position: relative; flex-shrink: 0; }
+    #map { width: 100%; height: 100%; z-index: 1; }
+    
+    aside { width: 100%; height: 50%; background-color: #ffffff; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+    
+    @media (min-width: 769px) {
+      .content-body { flex-direction: row; }
+      aside { width: 380px; height: 100%; border-top: none; border-right: 1px solid #e2e8f0; }
+      .map-wrapper { width: calc(100% - 380px); height: 100%; }
+    }
+    
+    .filter-box { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; background-color: #f8fafc; display: flex; flex-direction: column; gap: 6px; }
+    .search-wrapper { position: relative; width: 100%; }
+    .search-wrapper i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 13px; }
+    .search-input { width: 100%; padding: 8px 10px 8px 32px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+    .select-filter { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background-color: #fff; outline: none; }
+    
+    .providers-list { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .card-provider { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s; }
+    .card-provider:hover { border-color: #f59e0b; }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+    .card-title { font-size: 13px; font-weight: 700; color: #1e293b; }
+    
+    .badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid #cbd5e1; background-color: #e2e8f0; color: #334155; }
+    .badge-guincho { background-color: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+    .badge-oficina { background-color: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+    .badge-eletrica { background-color: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .badge-pecas { background-color: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+    
+    .card-address { font-size: 11px; color: #64748b; margin-bottom: 6px; }
+    .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 11px; border-top: 1px solid #e2e8f0; padding-top: 6px; margin-top: 6px; }
+    .whatsapp-link { color: #059669; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 4px; }
+    .card-actions { display: flex; gap: 8px; }
+    .btn-action { background: none; border: none; font-size: 11px; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+    .btn-edit { color: #2563eb; }
+    .btn-edit:hover { background-color: #dbeafe; }
+    .btn-delete { color: #dc2626; }
+    .btn-delete:hover { background-color: #fee2e2; }
+    
+    /* Modal Form */
+    .modal-overlay { position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.7); display: flex; align-items: center; justify-content: center; z-index: 3000; padding: 15px; }
+    .modal-overlay.hidden { display: none; }
+    .modal-card { background: #ffffff; border-radius: 12px; width: 100%; max-width: 420px; overflow: hidden; box-shadow: 0 20px 25px rgba(0,0,0,0.3); }
+    .modal-header { background: #0f172a; color: #fff; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 15px; font-weight: 700; }
+    .modal-close { background: none; border: none; color: #94a3b8; font-size: 16px; cursor: pointer; }
+    .modal-form { padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: 80vh; overflow-y: auto; }
+    .form-group { display: flex; flex-direction: column; gap: 3px; }
+    .form-group label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #475569; }
+    .form-group input, .form-group select, .form-group textarea { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; outline: none; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9; }
+    .btn-cancel { padding: 7px 14px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: transparent; cursor: pointer; color: #475569; }
+    .btn-save { padding: 7px 14px; background-color: #f59e0b; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; color: #020617; }
+    .geo-loading { font-size: 11px; color: #2563eb; font-style: italic; display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header>
+      <div class="logo-title">
+        <i class="fa-solid fa-truck-fast"></i>
+        <div>
+          <h1>Mapa Parceiros</h1>
+          <p>Rotas RS &rarr; MG (Extrema)</p>
+        </div>
+      </div>
+
+      <div class="route-toggle">
+        <button id="btn-rota1" onclick="selecionarRota('interior')" class="btn-route active">
+          <i class="fa-solid fa-mountain"></i>
+          <span>Interior</span>
+        </button>
+        <button id="btn-rota2" onclick="selecionarRota('litoral')" class="btn-route">
+          <i class="fa-solid fa-water"></i>
+          <span>Litoral</span>
+        </button>
+      </div>
+
+      <button onclick="abrirModalCadastro()" class="btn-add">
+        <i class="fa-solid fa-plus"></i>
+        <span>Novo</span>
+      </button>
+    </header>
+
+    <!-- Main Content -->
+    <div class="content-body">
+      <!-- Map Wrapper -->
+      <div class="map-wrapper">
+        <div id="map"></div>
+      </div>
+
+      <!-- Sidebar -->
+      <aside>
+        <div class="filter-box">
+          <div class="search-wrapper">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="search-input" onkeyup="filtrarPrestadores()" placeholder="Buscar cidade ou serviço..." class="search-input">
+          </div>
+          <select id="filter-categoria" onchange="filtrarPrestadores()" class="select-filter">
+            <option value="">Todas as Categorias</option>
+            <option value="Guincho 24h">Guincho 24h</option>
+            <option value="Oficina Mecânica">Oficina Mecânica</option>
+            <option value="Auto Elétrica">Auto Elétrica</option>
+            <option value="Borracharia">Borracharia</option>
+            <option value="Posto de Apoio">Posto de Apoio</option>
+            <option value="Peças">Peças</option>
+          </select>
+        </div>
+        <div id="lista-prestadores" class="providers-list"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Modal Form (Cadastrar / Editar) -->
+  <div id="modal-cadastro" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title">Cadastrar Fornecedor</h3>
+        <button onclick="fecharModalCadastro()" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-prestador" onsubmit="salvarPrestador(event)" class="modal-form">
+        <input type="hidden" id="p-id">
+        <input type="hidden" id="p-lat">
+        <input type="hidden" id="p-lng">
+        
+        <div class="form-group">
+          <label>Nome da Empresa</label>
+          <input type="text" id="p-nome" required placeholder="Ex: Auto Socorro Rápido">
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Rota Principal</label>
+            <select id="p-rota" required>
+              <option value="interior">Interior (BR-116)</option>
+              <option value="litoral">Litoral (BR-101)</option>
+              <option value="ambas">Ambas / Região Metropolitana</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Cidade / UF</label>
+            <input type="text" id="p-cidade" required placeholder="Ex: Caxias do Sul - RS">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Categoria</label>
+            <select id="p-categoria" required>
+              <option value="Guincho 24h">Guincho 24h</option>
+              <option value="Oficina Mecânica">Oficina Mecânica</option>
+              <option value="Auto Elétrica">Auto Elétrica</option>
+              <option value="Borracharia">Borracharia</option>
+              <option value="Posto de Apoio">Posto de Apoio</option>
+              <option value="Peças">Peças</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>WhatsApp / Telefone</label>
+            <input type="text" id="p-whats" required placeholder="Ex: 54999998888">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Endereço Completo</label>
+          <input type="text" id="p-endereco" placeholder="Rua, Número, Bairro">
+        </div>
+
+        <div class="form-group">
+          <label>Observações / Serviços</label>
+          <textarea id="p-obs" rows="2" placeholder="Atende carretas, plantão 24h..."></textarea>
+        </div>
+
+        <div id="geo-status" class="geo-loading">Buscando coordenadas no mapa...</div>
+
+        <div class="modal-actions">
+          <button type="button" onclick="fecharModalCadastro()" class="btn-cancel">Cancelar</button>
+          <button type="submit" class="btn-save">Salvar Parceiro</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Senha Lock do Desenvolvedor para exclusão
+    const SENHA_DEV_LOCK = "cadomar2026";
+
+    // Dados Iniciais Exemplo
+    const parceirosIniciais = [
+      { id: 1, nome: "Guincho Metropolitano POA", rota: "ambas", cidade: "Porto Alegre - RS", categoria: "Guincho 24h", whats: "51999887766", endereco: "Entrada BR-116 / BR-101", lat: -30.034, lng: -51.217, obs: "Tronco comum - Atende ambas as rotas" },
+      { id: 2, nome: "Auto Elétrica Litoral", rota: "litoral", cidade: "Osório - RS", categoria: "Auto Elétrica", whats: "51988776655", endereco: "BR-101, Km 80", lat: -29.886, lng: -50.270, obs: "Socorro elétrico na rodovia" },
+      { id: 3, nome: "Oficina Extrema Diesel", rota: "interior", cidade: "Extrema - MG", categoria: "Oficina Mecânica", whats: "35997766554", endereco: "Distrito Industrial", lat: -22.854, lng: -46.318, obs: "Especialista em motores pesados" }
+    ];
+
+    let parceiros = [];
+    let rotaAtual = 'interior';
+    let map = null;
+    let markersGroup = null;
+
+    // Carregar dados salvos ou padrão
+    function carregarDados() {
+      const saved = localStorage.getItem('cadomar_parceiros_mapa');
+      if (saved) {
+        try {
+          parceiros = JSON.parse(saved);
+        } catch (e) {
+          parceiros = [...parceirosIniciais];
+        }
+      } else {
+        parceiros = [...parceirosIniciais];
+        salvarStorage();
+      }
+    }
+
+    function salvarStorage() {
+      localStorage.setItem('cadomar_parceiros_mapa', JSON.stringify(parceiros));
+    }
+
+    // Inicialização do Mapa
+    function initMap() {
+      map = L.map('map').setView([-26.0, -49.5], 6);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      markersGroup = L.layerGroup().addTo(map);
+
+      setTimeout(() => { map.invalidateSize(); }, 300);
+    }
+
+    // Seleção de Rota
+    function selecionarRota(rota) {
+      rotaAtual = rota;
+      document.getElementById('btn-rota1').classList.toggle('active', rota === 'interior');
+      document.getElementById('btn-rota2').classList.toggle('active', rota === 'litoral');
+      filtrarPrestadores();
+    }
+
+    // Badge CSS Helper
+    function getBadgeClass(cat) {
+      if (cat.includes('Guincho')) return 'badge-guincho';
+      if (cat.includes('Oficina')) return 'badge-oficina';
+      if (cat.includes('Elétrica')) return 'badge-eletrica';
+      if (cat.includes('Peças')) return 'badge-pecas';
+      return '';
+    }
+
+    // Renderizar e Filtrar (considera 'ambas' para ambas as rotas)
+    function filtrarPrestadores() {
+      const search = document.getElementById('search-input').value.toLowerCase();
+      const cat = document.getElementById('filter-categoria').value;
+
+      const filtrados = parceiros.filter(p => {
+        const matchRota = (p.rota === rotaAtual || p.rota === 'ambas');
+        const matchCat = !cat || p.categoria === cat;
+        const matchText = p.nome.toLowerCase().includes(search) || 
+                          p.cidade.toLowerCase().includes(search) || 
+                          (p.obs && p.obs.toLowerCase().includes(search));
+        return matchRota && matchCat && matchText;
+      });
+
+      renderLista(filtrados);
+      renderMapa(filtrados);
+    }
+
+    function renderLista(lista) {
+      const container = document.getElementById('lista-prestadores');
+      container.innerHTML = '';
+
+      if (lista.length === 0) {
+        container.innerHTML = '<p style="font-size:12px; color:#94a3b8; text-align:center; padding:20px;">Nenhum parceiro encontrado nesta rota.</p>';
+        return;
+      }
+
+      lista.forEach(p => {
+        const numClean = p.whats.replace(/\D/g, '');
+        const card = document.createElement('div');
+        card.className = 'card-provider';
+        card.onclick = () => focarNoMapa(p.lat, p.lng);
+
+        card.innerHTML = `
+          <div class="card-header">
+            <span class="card-title">${p.nome}</span>
+            <span class="badge ${getBadgeClass(p.categoria)}">${p.categoria}</span>
+          </div>
+          <div class="card-address"><i class="fa-solid fa-location-dot"></i> ${p.cidade} ${p.endereco ? '- ' + p.endereco : ''}</div>
+          ${p.obs ? `<div style="font-size:10px; color:#475569; margin-bottom:4px;">${p.obs}</div>` : ''}
+          <div class="card-footer">
+            <a href="https://wa.me/55${numClean}" target="_blank" onclick="event.stopPropagation()" class="whatsapp-link">
+              <i class="fa-brands fa-whatsapp"></i> ${p.whats}
+            </a>
+            <div class="card-actions">
+              <button onclick="event.stopPropagation(); editarPrestador(${p.id})" class="btn-action btn-edit" title="Editar"><i class="fa-solid fa-pen"></i></button>
+              <button onclick="event.stopPropagation(); excluirPrestador(${p.id})" class="btn-action btn-delete" title="Exigir Senha Lock do Desenvolvedor"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderMapa(lista) {
+      markersGroup.clearLayers();
+      const bounds = [];
+
+      lista.forEach(p => {
+        if (p.lat && p.lng) {
+          const marker = L.marker([p.lat, p.lng]);
+          const numClean = p.whats.replace(/\D/g, '');
+
+          marker.bindPopup(`
+            <div style="font-size:12px;">
+              <strong>${p.nome}</strong><br>
+              <span style="color:#64748b;">${p.categoria}</span><br>
+              <small>${p.cidade}</small><br><br>
+              <a href="https://wa.me/55${numClean}" target="_blank" style="color:#059669; font-weight:bold; text-decoration:none;">
+                <i class="fa-brands fa-whatsapp"></i> Chamar WhatsApp
+              </a>
+            </div>
+          `);
+
+          markersGroup.addLayer(marker);
+          bounds.push([p.lat, p.lng]);
+        }
+      });
+
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+      }
+    }
+
+    function focarNoMapa(lat, lng) {
+      if (lat && lng && map) {
+        map.setView([lat, lng], 13);
+      }
+    }
+
+    // Modal Operations
+    function abrirModalCadastro() {
+      document.getElementById('modal-title').innerText = 'Cadastrar Fornecedor';
+      document.getElementById('form-prestador').reset();
+      document.getElementById('p-id').value = '';
+      document.getElementById('p-rota').value = rotaAtual;
+      document.getElementById('modal-cadastro').classList.remove('hidden');
+    }
+
+    function fecharModalCadastro() {
+      document.getElementById('modal-cadastro').classList.add('hidden');
+    }
+
+    function editarPrestador(id) {
+      const p = parceiros.find(item => item.id === id);
+      if (!p) return;
+
+      document.getElementById('modal-title').innerText = 'Editar Fornecedor';
+      document.getElementById('p-id').value = p.id;
+      document.getElementById('p-nome').value = p.nome;
+      document.getElementById('p-rota').value = p.rota;
+      document.getElementById('p-cidade').value = p.cidade;
+      document.getElementById('p-categoria').value = p.categoria;
+      document.getElementById('p-whats').value = p.whats;
+      document.getElementById('p-endereco').value = p.endereco || '';
+      document.getElementById('p-obs').value = p.obs || '';
+      document.getElementById('p-lat').value = p.lat || '';
+      document.getElementById('p-lng').value = p.lng || '';
+
+      document.getElementById('modal-cadastro').classList.remove('hidden');
+    }
+
+    // Exclusão protegida por Senha Lock
+    function excluirPrestador(id) {
+      const senhaDigitada = prompt('Área Restrita do Desenvolvedor: Digite a Senha Lock para excluir este fornecedor:');
+      
+      if (senhaDigitada === null) return;
+
+      if (senhaDigitada === SENHA_DEV_LOCK) {
+        if (confirm('Senha correta! Deseja realmente remover este parceiro permanentemente?')) {
+          parceiros = parceiros.filter(p => p.id !== id);
+          salvarStorage();
+          filtrarPrestadores();
+        }
+      } else {
+        alert('Senha Lock incorreta! Apenas o desenvolvedor autorizado pode apagar fornecedores.');
+      }
+    }
+
+    async function salvarPrestador(e) {
+      e.preventDefault();
+      
+      const id = document.getElementById('p-id').value;
+      const nome = document.getElementById('p-nome').value;
+      const rota = document.getElementById('p-rota').value;
+      const cidade = document.getElementById('p-cidade').value;
+      const categoria = document.getElementById('p-categoria').value;
+      const whats = document.getElementById('p-whats').value;
+      const endereco = document.getElementById('p-endereco').value;
+      const obs = document.getElementById('p-obs').value;
+      let lat = parseFloat(document.getElementById('p-lat').value);
+      let lng = parseFloat(document.getElementById('p-lng').value);
+
+      if ((isNaN(lat) || isNaN(lng)) && cidade) {
+        document.getElementById('geo-status').style.display = 'block';
+        try {
+          const query = encodeURIComponent(`${cidade}, Brasil`);
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
+          const data = await res.json();
+          if (data && data.length > 0) {
+            lat = parseFloat(data[0].lat);
+            lng = parseFloat(data[0].lon);
+          }
+        } catch (err) {
+          console.error("Erro na geocodificação:", err);
+        }
+        document.getElementById('geo-status').style.display = 'none';
+      }
+
+      if (id) {
+        const index = parceiros.findIndex(p => p.id == id);
+        if (index !== -1) {
+          parceiros[index] = { id: parseInt(id), nome, rota, cidade, categoria, whats, endereco, obs, lat, lng };
+        }
+      } else {
+        const novo = {
+          id: Date.now(),
+          nome, rota, cidade, categoria, whats, endereco, obs, lat, lng
+        };
+        parceiros.push(novo);
+      }
+
+      salvarStorage();
+      fecharModalCadastro();
+      filtrarPrestadores();
+    }
+
+    window.onload = () => {
+      carregarDados();
+      initMap();
+      filtrarPrestadores();
+    };
+  </script>
+</body>
+</html>
